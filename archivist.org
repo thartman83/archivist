@@ -1,0 +1,20 @@
+#+TITLE: Archivist
+#+AUTHOR: Tom Hartman
+
+* Stacks
+Setup the stacks by running the following commands from within the stacks directory
+
+#+begin_src sh
+cd stack
+kubectl create ns archives
+kubectl apply -n archives -f stacks-configmap.yaml
+kubectl apply -n archives -f stacks-statefulset.yaml
+
+kubectl apply -n archives -f stacks-sentinels.yaml
+#+end_src
+
+The config map can be re-generated from a config file by calling
+
+#+begin_src sh
+kubectl create configmap stacks-configmap.yaml --from-file=redis.conf
+#+end_src

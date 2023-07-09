@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: stacks
+spec:
+  serviceName: stacks
+  replicas: 3
+  selector:
+    matchLabels:
+      app: stacks
+  template:
+    metadata:
+      labels:
+        app: stacks
+    spec:
+      initContainers:
+      - name: config
+        image: redis/redis-stack-server:latest
+        env:
+          - name: STACKS_REDIS_PASSWD
+            valueFrom:
+              secretKeyRef:
+                name: stacks-redis-secrets
+                key: stacks-redis-passwd
+        command: [ "sh", "-c" ]
+        args:
+          - |
+            sed -e "s/STACKS_REDIS_PASSWD/$STACKS_REDIS_PASSWD/g" /tmp/redis/redis.conf > /etc/redis/redis.conf
+            echo "finding master..."
+            MASTER_FDQN=`hostname  -f | sed -e 's/stacks-[0-9]\./stacks-0./'`
+            if [ "$(redis-cli -h sentinel -p 5000 ping)" != "PONG" ]; then
+              echo "master not found, defaulting to redis-0"
+
+              if [ "$(hostname)" = "stacks-0" ]; then
+                echo "this is stacks-0, not updating config..."
+              else
+                echo "updating redis.conf..."
+                echo "replicaof $MASTER_FDQN 6379" >> /etc/redis/redis.conf
+              fi
+            else
+              echo "sentinel found, finding master"
+              MASTER="$(redis-cli -h sentinel -p 5000 sentinel get-master-addr-by-name mymaster | grep -E '(^stacks-\d{1,})|([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})')"
+              echo "master found : $MASTER, updating redis.conf"
+              echo "replicaof $MASTER 6379" >> /etc/redis/redis.conf
+            fi
+        volumeMounts:
+        - name: stacks-redis-config
+          mountPath: /etc/redis/
+        - name: config
+          mountPath: /tmp/redis/
+      containers:
+      - name: stacks
+        image: redis/redis-stack-server:latest
+        env:
+          - name: STACKS_REDIS_PASSWD
+            valueFrom:
+              secretKeyRef:
+                name: stacks-redis-secrets
+                key: stacks-redis-passwd
+        command: ["redis-server"]
+        args: ["/etc/redis/redis.conf"]
+        ports:
+        - containerPort: 6379
+          name: stacks
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: stacks-redis-config
+          mountPath: /etc/redis/
+      volumes:
+      - name: stacks-redis-config
+        emptyDir: {}
+      - name: config
+        configMap:
+          name: stacks-redis-config
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: longhorn
+      resources:
+        requests:
+          storage: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stacks
+spec:
+  clusterIP: None
+  ports:
+  - port: 6379
+    targetPort: 6379
+    name: stacks
+  selector:
+    app: stacks
