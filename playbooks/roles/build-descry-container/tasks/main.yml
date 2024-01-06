@@ -1,0 +1,8 @@
+- name: Build Descry Container
+  docker_image:
+    name: "{{ git_repository }}/archivist/descry:{{ descry_version }}"
+    build:
+      path: "{{ descry_gitrepo }}"
+#      path: "{{ descry_build_dir.path }}"
+    push: true
+    source: build

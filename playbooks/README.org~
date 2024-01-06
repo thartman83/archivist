@@ -1,0 +1,435 @@
+#+TITLE: Archivist Playbooks
+#+AUTHOR: Tom Hartman
+#+STARTUP: overview
+
+* Table of Contents
+* Makefile
+
+#+begin_src makefile :tangle Makefile
+ANSIBLE= ansible-playbook
+HOSTS= inventory/hosts.ini
+EMACS= emacs
+
+.PHONY: tangle descry
+
+tangle: README.org
+	${EMACS} $< --batch --eval '(org-babel-tangle-file "README.org")'
+
+descry: tangle
+	${ANSIBLE} -i ${HOSTS} deploy-descry.yml
+
+stacks: tangle
+	${ANSIBLE} -i ${HOSTS} deploy-stacks.yml
+#+end_src
+
+* Inventory
+
+#+begin_src init :tangle inventory/hosts.ini
+[controller]
+boreas
+#+end_src
+
+* Playbook Definitions
+
+** Descry
+#+begin_src yaml :tangle deploy-descry.yml
+---
+- name: Build descry container
+  hosts: localhost
+  connection: local
+  roles:
+    - role: create-temp-dir
+    - role: build-descry-container
+
+- name: Deploy descry microservice
+  hosts: controller
+  roles:
+    - role: create-namespace
+    - role: create-descry-pvc
+    - role: deploy-descry
+    - role: create-descry-service
+#+end_src
+
+** Stacks
+#+begin_src yaml :tangle deploy-stacks.yml
+- name: Build stacks container
+  hosts: localhost
+  connection: local
+  roles:
+    - role: create-stacks-container
+#    - role: create-temp-dir
+#    - role: build-stacks-container
+
+- name: Deploy stacks microservice
+  hosts: controller
+  roles:
+    - role: create-namespace
+    - role: create-stacks-storage
+    - role: create-stacks-db-storage
+    - role: create-stacks-db-configmap
+    - role: create-stacks-configmap
+    - role: deploy-stacks-db
+    - role: deploy-stacks
+    - role: create-stacks-service
+#+end_src
+* Roles
+** Create Temp Directory
+#+begin_src yaml :tangle roles/create-temp-dir/tasks/main.yml
+- name: Create the descry image build directory
+  tempfile:
+    state: directory
+    suffix: descry
+  register: descry_build_dir
+
+- name: Clone the current repository
+  git:
+    repo: "{{ descry_gitrepo }}"
+    dest: "{{ descry_build_dir.path }}"
+    clone: yes
+#+end_src
+** Build Descry Container
+
+#+begin_src yaml :tangle roles/build-descry-container/tasks/main.yml
+- name: Build Descry Container
+  docker_image:
+    name: "{{ git_repository }}/archivist/descry:{{ descry_version }}"
+    build:
+      path: "{{ descry_gitrepo }}"
+#      path: "{{ descry_build_dir.path }}"
+    push: true
+    source: build
+#+end_src
+** Create Namespace if needed
+#+begin_src yaml :tangle roles/create-namespace/tasks/main.yml
+- name: Create the archivist namespace if needed
+  kubernetes.core.k8s:
+    name: "{{ archivist_namespace }}"
+    api_version: v1
+    kind: Namespace
+    state: present
+#+end_src
+** Create Descry PVC
+
+#+begin_src yaml :tangle roles/create-descry-pvc/templates/create-descry-pvc.yml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: "{{ descry_pvc_name }}"
+  namespace: "{{ archivist_namespace }}"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: {{ descry_pvc_size }}
+#+end_src
+
+#+begin_src yaml :tangle roles/create-descry-pvc/tasks/main.yml
+- name: Create Container PVC
+  k8s:
+    definition: "{{ lookup('template', 'templates/create-descry-pvc.yml') | from_yaml }}"
+#+end_src
+** Deploy Descry
+
+#+begin_src yaml :tangle roles/deploy-descry/templates/deploy-descry.yml
+apiVersion: v1
+kind: Deployment
+metadata:
+  labels:
+    run: {{ descry_label }}
+  name: {{ descry_label }}
+  namespace: {{ archivist_namespace }}
+spec:
+  replicas: {{ descry_replicas }}
+  selector:
+    matchLabels:
+      run: {{ descry_label }}
+  template:
+    metadata:
+      labels:
+        run: {{ descry_label }}
+        app: {{ descry_label }}
+    spec:
+      nodeSelector:
+        node-type: worker
+      containers:
+      - name: {{ descry_label }}
+        image: "{{ git_repository }}/archivist/descry:{{ descry_version }}"
+        ports:
+        - containerPort: {{ descry_port }}
+        volumeMounts:
+        - name: descry-storage
+          mountPath: "/opt"
+        env:
+        - name: ANAME
+          value: "AVALUE"
+      volumes:
+      - name: descry-storage
+        persistentVolumeClaim:
+          claimName: {{ descry_pvc_name }}
+#+end_src
+
+#+begin_src yaml :tangle roles/deploy-descry/tasks/main.yml
+- name: Deploy Descry container
+  k8s:
+    definition: "{{ lookup('template', 'templates/deploy-descry.yml') | from_yaml }}"
+    apply: true
+#+end_src
+
+** Create Descry Service
+
+#+begin_src yaml :tangle roles/create-descry-service/templates/descry-service.yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ descry_service_name }}
+  namespace: {{ archivist_namespace }}
+  annotations:
+    metallb.universe.tf/address-pool: default-pool
+spec:
+  selector:
+    app: {{ descry_label }}
+  ports:
+  - port: {{ descry_port }}
+    targetPort: {{ descry_port }}
+  type: LoadBalancer
+  loadBalancerIP: {{ descry_service_ip }}
+#+end_src
+
+#+begin_src yaml :tangle roles/create-descry-service/tasks/main.yml
+- name: Create Descry Service
+  k8s:
+    definition: "{{ lookup('template', 'templates/descry-service.yml') | from_yaml }}"
+    apply: true
+#+end_src
+
+** Create Stacks Storage
+#+begin_src yaml :tangle roles/create-stacks-storage/templates/stacks-pvc.yml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: "{{ stacks_pvc_name }}"
+  namespace: "{{ archivist_namespace }}"
+  labels:
+    app: "{{ stacks_label }}"
+spec:
+  storageClassName: longhorn
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ stacks_pvc_size }}
+#+end_src
+
+#+begin_src yaml :tangle roles/create-stacks-storage/tasks/main.yml
+- name: Create Stacks PVC
+  k8s:
+    definition: "{{ lookup('template', 'templates/stacks-pvc.yml') | from_yaml }}"
+#+end_src
+
+** Create Stacks DB PVC
+#+begin_src yaml :tangle roles/create-stacks-db-storage/templates/stacks-db-pvc.yml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: "{{ stacks_db_pvc_name }}"
+  namespace: "{{ archivist_namespace }}"
+  labels:
+    app: "{{ stacks_db_label }}"
+spec:
+  storageClassName: longhorn
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ stacks_db_pvc_size }}
+#+end_src
+
+#+begin_src yaml :tangle roles/create-stacks-db-storage/tasks/main.yml
+- name: Create Stacks DB PVC
+  k8s:
+    definition: "{{ lookup('template', 'templates/stacks-db-pvc.yml') | from_yaml }}"
+#+end_src
+
+** Create Stacks DB ConfigMap
+#+begin_src yaml :tangle roles/create-stacks-db-configmap/templates/stacks-db-configmap.yml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ stacks_db_configmap }}"
+  namespace: "{{ archivist_namespace }}"
+  labels:
+    app: "{{ stacks_db_label }}"
+data:
+  POSTGRES_DB: postgresdb
+  POSTGRES_USER: admin
+  POSTGRES_PASSWORD: devtest1234
+#+end_src
+
+#+begin_src yaml :tangle roles/create-stacks-db-configmap/tasks/main.yml
+- name: Create stacks db config map
+  k8s:
+    definition: "{{ lookup('template', 'templates/stacks-db-configmap.yml') | from_yaml }}"
+#+end_src
+
+** Create Stacks ConfigMap
+#+begin_src yaml :tangle roles/create-stacks-configmap/templates/create-stacks-configmap.yml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ stacks_configmap }}"
+  namespace: "{{ archivist_namespace }}"
+  labels:
+    app: "{{ stacks_label }}"
+data:
+  DBURL: "postgresql://admin:devtest1234@{{ stacks_db_label }}/stacks"
+#+end_src
+
+#+begin_src yaml :tangle roles/create-stacks-configmap/tasks/main.yml
+- name: Create stacks configmap
+  k8s:
+    definition: "{{ lookup('template', 'templates/create-stacks-configmap.yml') | from_yaml }}"
+#+end_src
+** Deploy Stacks DB
+#+begin_src yaml :tangle roles/deploy-stacks-db/templates/stacks-db-deployment.yml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: "{{ stacks_db_label }}"
+  namespace: "{{ archivist_namespace }}"
+spec:
+  serviceName: "{{ stacks_db_label }}"
+  repliacs: "{{ stacks_db_replicas }}"
+  selector:
+    matchLabels:
+      app: "{{ stacks_db_label }}"
+  template:
+    metadata:
+      labels:
+        app: "{{ stacks_db_label }}"
+    spec:
+      containers:
+        - name: "{{ stacks_db_label }}"
+          image: "{{ stacks_db_container }}"
+          imagePullPolicy: "IfNotPresent"
+          ports:
+            - containerPort: {{ stacks_db_port }}
+          envFrom:
+            - configMapRef:
+                name: "{{ stacks_db_configmap }}"
+          volumeMounts:
+            - mountPath: "{{ stacks_db_volume_mount_path }}"
+              name: "{{ stacks_db_volume_name }}"
+              subpath: "{{ stacks_db_volume_mount_subpath }}"
+      volumes:
+        - name: "{{ stacks_db_volume_name }}"
+          persistentVolumeClaim:
+            claimName: "{{ stacks_db_pvc_name }}"
+#+end_src
+
+#+begin_src yaml :tangle roles/deploy-stacks-db/tasks/main.yml
+- name: Deploy stacks database
+  k8s:
+    definition: "{{ lookup('template', 'templates/stacks-db-deployment.yml') | from_yaml }}"
+    apply: true
+#+end_src
+
+** Create Stacks Container
+#+begin_src yaml :tangle roles/create-stacks-container/tasks/main.yml
+- name: Create the stacks image build directory
+  tempfile:
+    state: directory
+    suffix: stacks
+  register: stacks_build_dir
+
+# - name: Clone the current repository
+#   git:
+#     repo: "{{ stacks_gitrepo }}"
+#     dest: "{{ stacks_build_dir.path }}"
+#     clone: yes
+
+- name: Build Stacks Container
+  docker_image:
+    name: "{{ git_repository }}/archivist/stacks:{{ stacks_version }}"
+    build:
+      path: "{{ stacks_gitrepo }}"
+    push: true
+    source: build
+#+end_src
+
+** Deploy the stacks
+#+begin_src yaml :tangle roles/deploy-stacks/templates/deploy-stacks.yml
+apiVersion: v1
+kind: Deployment
+metadata:
+  name: {{ stacks_label }}
+  namespace: {{ archivist_namespace }}
+  labels:
+    app: {{ stacks_label }}
+spec:
+  replicas: {{ stacks_replicas }}
+  selector:
+    matchLabels:
+      run: {{ stacks_label }}
+  template:
+    metadata:
+      labels:
+        run: {{ stacks_label }}
+        app: {{ stacks_label }}
+    spec:
+      nodeSelector:
+        node-type: worker
+      containers:
+      - name: {{ stacks_label }}
+        image: "{{ git_repository }}/archivist/stacks:{{ stacks_version }}"
+        ports:
+        - containerPort: {{ stacks_port }}
+        volumeMounts:
+        - name: stacks-storage
+          mountPath: "/opt"
+          subPath: "stacks"
+        env:
+          - name: DBURL
+            valueFrom:
+              configMapKeyRef:
+                name: {{ stacks_configmap }}
+                key: DBURL
+      volumes:
+      - name: stacks-storage
+        persistentVolumeClaim:
+          claimName: {{ stacks_pvc_name }}
+
+#+end_src
+
+#+begin_src yaml :tangle roles/deploy-stacks/tasks/main.yml
+- name: Deploy the stacks
+  k8s:
+    definition: "{{ lookup('template', 'templates/deploy-stacks.yml') | from_yaml }}"
+    apply: true
+#+end_src
+
+** Deploy stacks service
+#+begin_src yaml :tangle roles/create-stacks-service/templates/create-stacks-service.yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ stacks_service_name }}
+  namespace: {{ archivist_namespace }}
+  annotations:
+    metallb.universe.tf/address-pool: default-pool
+spec:
+  selector:
+    app: {{ stacks_label }}
+  ports:
+  - port: {{ stacks_port }}
+    targetPort: {{ stacks_port }}
+  type: LoadBalancer
+  loadBalancerIP: {{ stacks_service_ip }}
+#+end_src
+
+#+begin_src yaml :tangle roles/create-stacks-service/tasks/main.yml
+- name: Create stacks service
+  k8s:
+    definition: "{{ lookup('template', 'templates/create-stacks-service.yml') | from_yaml }}"
+#+end_src

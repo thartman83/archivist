@@ -1,0 +1,4 @@
+- name: Create stacks db config map
+  k8s:
+    definition: "{{ lookup('template', 'templates/stacks-db-configmap.yml') | from_yaml }}"
+    apply: true

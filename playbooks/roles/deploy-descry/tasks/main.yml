@@ -1,0 +1,4 @@
+- name: Deploy Descry container
+  k8s:
+    definition: "{{ lookup('template', 'templates/deploy-descry.yml') | from_yaml }}"
+    apply: true

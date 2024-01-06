@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ descry_service_name }}
+  namespace: {{ archivist_namespace }}
+  annotations:
+    metallb.universe.tf/address-pool: default-pool
+spec:
+  selector:
+    app: {{ descry_label }}
+  ports:
+  - port: 5000
+    targetPort: 5000
+  type: LoadBalancer
+  loadBalancerIP: {{ descry_service_ip }}

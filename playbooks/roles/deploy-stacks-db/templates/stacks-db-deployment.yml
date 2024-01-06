@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: "{{ stacks_db_label }}"
+  namespace: "{{ archivist_namespace }}"
+spec:
+  serviceName: "{{ stacks_db_label }}"
+  repliacs: "{{ stacks_db_replicas }}"
+  selector:
+    matchLabels:
+      app: "{{ stacks_db_label }}"
+  template:
+    metadata:
+      labels:
+        app: "{{ stacks_db_label }}"
+    spec:
+      containers:
+        - name: "{{ stacks_db_label }}"
+          image: "{{ stacks_db_container }}"
+          imagePullPolicy: "IfNotPresent"
+          ports:
+            - containerPort: {{ stacks_db_port }}
+          envFrom:
+            - configMapRef:
+                name: "{{ stacks_db_configmap }}"
+          volumeMounts:
+            - mountPath: "{{ stacks_db_volume_mount_path }}"
+              name: "{{ stacks_db_volume_name }}"
+              subpath: "{{ stacks_db_volume_mount_subpath }}"
+      volumes:
+        - name: "{{ stacks_db_volume_name }}"
+          persistentVolumeClaim:
+            claimName: "{{ stacks_db_pvc_name }}"

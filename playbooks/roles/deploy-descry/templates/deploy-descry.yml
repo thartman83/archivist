@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Deployment
+metadata:
+  labels:
+    run: {{ descry_label }}
+  name: {{ descry_label }}
+  namespace: {{ archivist_namespace }}
+spec:
+  replicas: {{ descry_replicas }}
+  selector:
+    matchLabels:
+      run: {{ descry_label }}
+  template:
+    metadata:
+      labels:
+        run: {{ descry_label }}
+        app: {{ descry_label }}
+    spec:
+      nodeSelector:
+        node-type: worker
+      containers:
+      - name: {{ descry_label }}
+        image: "{{ git_repository }}/archivist/descry:{{ descry_version }}"
+        ports:
+        - containerPort: {{ descry_port }}
+        volumeMounts:
+        - name: descry-storage
+          mountPath: "/opt"
+        env:
+        - name: ANAME
+          value: "AVALUE"
+      volumes:
+      - name: descry-storage
+        persistentVolumeClaim:
+          claimName: {{ descry_pvc_name }}

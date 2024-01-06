@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Deployment
+metadata:
+  name: {{ stacks_label }}
+  namespace: {{ archivist_namespace }}
+  labels:
+    app: {{ stacks_label }}
+spec:
+  replicas: {{ stacks_replicas }}
+  selector:
+    matchLabels:
+      run: {{ stacks_label }}
+  template:
+    metadata:
+      labels:
+        run: {{ stacks_label }}
+        app: {{ stacks_label }}
+    spec:
+      nodeSelector:
+        node-type: worker
+      containers:
+      - name: {{ stacks_label }}
+        image: "{{ git_repository }}/archivist/stacks:{{ stacks_version }}"
+        imagePullPolicy: Always
+        ports:
+        - containerPort: {{ stacks_port }}
+        volumeMounts:
+        - name: stacks-storage
+          mountPath: "/opt/stacks"
+        env:
+          - name: SQL_URL
+            valueFrom:
+              configMapKeyRef:
+                name: {{ stacks_configmap }}
+                key: DBURL
+      volumes:
+      - name: stacks-storage
+        persistentVolumeClaim:
+          claimName: {{ stacks_pvc_name }}

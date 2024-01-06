@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ stacks_db_service_name }}
+  namespace: {{ archivist_namespace }}
+  annotations:
+    metallb.universe.tf/address-pool: default-pool
+spec:
+  selector:
+    app: {{ stacks_db_label }}
+  ports:
+  - port: {{ stacks_db_port }}
+    targetPort: {{ stacks_db_port }}
+  type: LoadBalancer
+  loadBalancerIP: {{ stacks_db_service_ip }}

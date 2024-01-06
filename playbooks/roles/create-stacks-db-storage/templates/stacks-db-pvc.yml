@@ -1,0 +1,14 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: "{{ stacks_db_pvc_name }}"
+  namespace: "{{ archivist_namespace }}"
+  labels:
+    app: "{{ stacks_db_label }}"
+spec:
+  storageClassName: longhorn
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ stacks_db_pvc_size }}

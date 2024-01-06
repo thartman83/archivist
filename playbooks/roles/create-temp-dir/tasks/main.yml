@@ -1,0 +1,11 @@
+- name: Create the descry image build directory
+  tempfile:
+    state: directory
+    suffix: descry
+  register: descry_build_dir
+
+- name: Clone the current repository
+  git:
+    repo: "{{ descry_gitrepo }}"
+    dest: "{{ descry_build_dir.path }}"
+    clone: yes

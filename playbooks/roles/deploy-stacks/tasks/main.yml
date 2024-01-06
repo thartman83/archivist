@@ -1,0 +1,5 @@
+- name: Deploy the stacks
+  k8s:
+    definition: "{{ lookup('template', 'templates/deploy-stacks.yml') | from_yaml }}"
+    apply: true
+    force: true

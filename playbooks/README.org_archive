@@ -1,0 +1,52 @@
+#    -*- mode: org -*-
+
+
+Archived entries from file /home/thartman/projects/archivist/playbooks/README.org
+
+
+* Group Variables
+:PROPERTIES:
+:ARCHIVE_TIME: 2024-01-06 Sat 13:46
+:ARCHIVE_FILE: ~/projects/archivist/playbooks/README.org
+:ARCHIVE_CATEGORY: README
+:END:
+
+#+begin_src yaml :tangle group_vars/all
+archivist_namespace: archivist
+
+descry_pvc_name: descry-pvc
+descry_label: descry
+descry_service_name: descry-service
+descry_service_ip: 172.17.1.64
+descry_pvc_size: 2Gi
+descry_replicas: 1
+#descry_gitrepo: https://github.com/thartman83/archivist-descry.git
+descry_gitrepo: ~/projects/archivist-descry/
+descry_port: 5000
+descry_version: latest
+
+stacks_pvc_name: stacks-pvc
+stacks_label: stacks
+stacks_service_name: stacks-service
+stacks_configmap: stacks-configmap
+stacks_service_ip: 172.17.1.65
+stacks_pvc_size: 2Gi
+stacks_replicas: 1
+stacks_gitrepo: ~/projects/archivist-stacks/
+stacks_port: 80
+stacks_version: latest
+
+stacks_db_label: stacks-db
+stacks_db_pvc_size: 5Gi
+stacks_db_pvc_name: stacks-db-pvc
+stacks_db_port: 5432
+stacks_db_replicas: 1
+stacks_db_container: postgres:10.1
+stacks_db_volume_mount_path: /var/lib/postgresql
+stacks_db_volume_mount_subpath: data
+stacks_db_volume_name: stacks-db-volume
+stacks_db_configmap: stacks-db-configmap
+
+git_repository: 172.17.1.62:5000
+
+#+end_src

@@ -1,0 +1,4 @@
+- name: Deploy stacks database
+  k8s:
+    definition: "{{ lookup('template', 'templates/stacks-db-deployment.yml') | from_yaml }}"
+    apply: true

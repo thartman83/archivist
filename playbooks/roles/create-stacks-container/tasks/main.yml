@@ -1,0 +1,20 @@
+# - name: Create the stacks image build directory
+#   tempfile:
+#     state: directory
+#     suffix: stacks
+#   register: stacks_build_dir
+
+# - name: Clone the current repository
+#   git:
+#     repo: "{{ stacks_gitrepo }}"
+#     dest: "{{ stacks_build_dir.path }}"
+#     clone: yes
+
+- name: Build Stacks Container
+  docker_image:
+    name: "{{ git_repository }}/archivist/stacks:{{ stacks_version }}"
+    build:
+      path: "{{ stacks_gitrepo }}"
+    push: true
+    source: build
+    force_source: true

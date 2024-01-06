@@ -1,0 +1,15 @@
+---
+- name: Build descry container
+  hosts: localhost
+  connection: local
+  roles:
+    - role: create-temp-dir
+    - role: build-descry-container
+
+- name: Deploy descry microservice
+  hosts: controller
+  roles:
+    - role: create-namespace
+    - role: create-descry-pvc
+    - role: deploy-descry
+    - role: create-descry-service

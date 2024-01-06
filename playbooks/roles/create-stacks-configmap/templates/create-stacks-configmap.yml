@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ stacks_configmap }}"
+  namespace: "{{ archivist_namespace }}"
+  labels:
+    app: "{{ stacks_label }}"
+data:
+  DBURL: "postgresql://admin:devtest1234@{{ stacks_db_service_name }}/stacks"

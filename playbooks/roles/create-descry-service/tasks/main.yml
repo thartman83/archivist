@@ -1,0 +1,4 @@
+- name: Create Descry Service
+  k8s:
+    definition: "{{ lookup('template', 'templates/descry-service.yml') | from_yaml }}"
+    apply: true

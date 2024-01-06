@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ stacks_db_configmap }}"
+  namespace: "{{ archivist_namespace }}"
+  labels:
+    app: "{{ stacks_db_label }}"
+data:
+  POSTGRES_DB: stacks
+  POSTGRES_USER: admin
+  POSTGRES_PASSWORD: devtest1234

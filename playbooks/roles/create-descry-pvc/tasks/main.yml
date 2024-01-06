@@ -1,0 +1,3 @@
+- name: Create Container PVC
+  k8s:
+    definition: "{{ lookup('template', 'templates/create-descry-pvc.yml') | from_yaml }}"

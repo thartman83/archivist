@@ -1,0 +1,3 @@
+- name: Create Stacks PVC
+  k8s:
+    definition: "{{ lookup('template', 'templates/stacks-pvc.yml') | from_yaml }}"

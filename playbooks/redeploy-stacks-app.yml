@@ -1,0 +1,10 @@
+- name: Build stacks container
+  hosts: localhost
+  connection: local
+  roles:
+    - role: create-stacks-container
+
+- name: Re-deploy stacks microservice
+  hosts: controller
+  roles:
+    - role: deploy-stacks

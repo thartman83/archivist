@@ -1,0 +1,20 @@
+- name: Build stacks container
+  hosts: localhost
+  connection: local
+  roles:
+    - role: create-stacks-container
+#    - role: create-temp-dir
+#    - role: build-stacks-container
+
+- name: Deploy stacks microservice
+  hosts: controller
+  roles:
+    - role: create-namespace
+    - role: create-stacks-storage
+    - role: create-stacks-db-storage
+    - role: create-stacks-db-configmap
+    - role: create-stacks-db-service
+    - role: create-stacks-configmap
+    - role: deploy-stacks-db
+    - role: deploy-stacks
+    - role: create-stacks-service
