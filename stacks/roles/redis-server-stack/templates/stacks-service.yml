@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ stacks_name }}
+  namespace: {{ archives_namespace }}
+spec:
+  clusterIP: None
+  ports:
+  - port: 6379
+    targetPort: 6379
+    name: {{ stacks_name }}
+  selector:
+    app: {{ stacks_name }}

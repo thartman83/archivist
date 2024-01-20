@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: descry
-        image: archivist-descry:latest
+        image: 172.17.1.62:5000/archivist-descry:0.1
         imagePullPolicy: Never
         #command: ["python3"]
         #args: ["/archivist-descry/run.py"]
@@ -38,4 +38,4 @@ spec:
       protocol: TCP
       port: 5000
       targetPort: 5000
-  loadBalancerIP: 172.17.1.19
+  loadBalancerIP: 172.17.1.65

@@ -1,0 +1,9 @@
+archives_namespace: archives
+stacks_configmap_name: stacks-config
+stacks_passwd: STACK_REDIS_PASSWD
+stacks_passwd_secret: stacks-secret
+stacks_passwd_key: stacks-passwd
+sentinel_name: stacks-sentinel
+sentinel_storage: 100Mi
+stacks_name: stacks
+stacks_storage: 2Gi

@@ -1,0 +1,30 @@
+- name: Create archives namespace if not present
+  k8s:
+    name: "{{ archives_namespace }}"
+    api_version: v1
+    kind: Namespace
+    state: present
+
+- name: Install the redis secret
+  k8s:
+    definition: "{{ lookup( 'template', 'templates/stacks-secret.yml' ) | from_yaml }}"
+
+- name: Install the config map resource
+  k8s:
+    definition: "{{ lookup( 'template', 'templates/configMap.yml' ) | from_yaml }}"
+
+- name: Create the stacks stateful set
+  k8s:
+    definition: "{{ lookup( 'template', 'templates/stacks.yml' ) | from_yaml }}"
+
+- name: Create the stacks service resource
+  k8s:
+    definition: "{{ lookup( 'template', 'templates/stacks-service.yml' ) | from_yaml }}"
+
+- name: Start the stack sentinels
+  k8s:
+    definition: "{{ lookup( 'template', 'templates/stacks-sentinels.yml' ) | from_yaml }}"
+
+- name: Create the sentinel service resources
+  k8s:
+    definition: "{{ lookup( 'template', 'templates/sentinel-service.yml' ) | from_yaml }}"

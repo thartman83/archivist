@@ -1,6 +1,6 @@
 FROM python:3.11-slim-bullseye
 
-WORKDIR /app
+WORKDIR /
 
 RUN apt-get update && apt-get install -y \
     sane \
@@ -17,4 +17,6 @@ RUN git clone --depth 1 --branch main https://github.com/thartman83/archivist-de
 
 RUN pip3 install -r /app/requirements.txt
 
-CMD [ "python3", "run.py"]
+EXPOSE 5000
+
+CMD [ "python3", "/app/run.py" ]

@@ -1,0 +1,7 @@
+- name: Undeploy descry
+  k8s:
+    name: descry
+    namespace: archives
+    kind: Deployment
+    state: absent
+    wait: True

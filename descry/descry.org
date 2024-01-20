@@ -1,0 +1,164 @@
+#+TITLE: Descry
+#+AUTHOR: Tom Hartman
+* General
+* Push Image
+
+#+begin_src makefile :tangle Makefile
+ANSIBLE=ansible-playbook
+DOCKERBUILD=docker build
+DOCKERPUSH=docker push
+DOCKERREPO=172.17.1.62:5000
+IMGNAME=descry
+DOCKERVERSION=latest
+HOSTS= inventory/hosts.ini
+EMACS= emacs
+TANGLEFILE=descry.org
+
+tangle: ${TANGLEFILE}
+	${EMACS} $< --batch --eval '(org-babel-tangle-file "${TANGLEFILE}")'
+
+docker-image: tangle
+	 ${DOCKERBUILD} ~/projects/archivist-descry/. -t ${DOCKERREPO}/${IMGNAME}:${DOCKERVERSION}
+	 ${DOCKERPUSH} ${DOCKERREPO}/${IMGNAME}:${DOCKERVERSION}
+
+redeploy:
+	${DOCKERBUILD} . -t ${DOCKERREPO}/${IMGNAME}:${DOCKERVERSION}
+	${DOCKERPUSH} ${DOCKERREPO}/${IMGNAME}:${DOCKERVERSION}
+	${ANSIBLE} -i inventory/hosts.ini undeploy-descry.yml
+	${ANSIBLE} -i inventory/hosts.ini deploy-descry.yml
+
+deploy: Dockerfile
+	${ANSIBLE} -i inventory/hosts.ini deploy-descry.yml
+
+undeploy: Dockerfile
+	${ANSIBLE} -i inventory/hosts.ini undeploy-descry.yml
+#+end_src
+
+#+begin_src dockerfile :tangle Dockerfile
+FROM python:3.11-slim-bullseye
+
+WORKDIR /
+
+RUN apt-get update && apt-get install -y \
+    sane \
+    sane-utils \
+    libsane-dev \
+    gcc \
+    git \
+    sane-airscan \
+    curl \
+    iputils-ping \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git clone --depth 1 --branch main https://github.com/thartman83/archivist-descry.git /app
+
+RUN pip3 install -r /app/requirements.txt
+
+EXPOSE 5000
+
+CMD [ "python3", "/app/run.py" ]
+#+end_src
+
+#+begin_src sh
+docker build -t 172.17.1.62:5000/descry:0.3 . && docker push 172.17.1.62:5000/descry:0.3
+#+end_src
+
+#+begin_src yaml :tangle inventory/hosts.ini
+[controller]
+boreas
+#+end_src
+
+#+begin_src yaml :tangle group_vars/all
+appname: descry
+appport: 5000
+#+end_src
+
+#+begin_src yaml :tangle deploy-descry.yml
+- name: Deploy Descry Microservice
+  hosts: controller
+  roles:
+    - role: deploy-descry
+#+end_src
+
+#+begin_src yaml :tangle undeploy-descry.yml
+- name: Undeploy Descry Microservice
+  hosts: controller
+  roles:
+    - role: undeploy-descry
+#+end_src
+* Roles
+
+** Deploy
+#+begin_src yaml :tangle roles/deploy-descry/templates/descry-deployment.yml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ appname }}
+  namespace: archives
+  labels:
+    run: {{ appname }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      run: {{ appname }}
+  template:
+    metadata:
+      labels:
+        run: {{ appname }}
+        app: {{ appname }}
+    spec:
+      containers:
+      - name: descry
+        image: 172.17.1.62:5000/descry:latest
+        ports:
+        - containerPort: {{ appport }}
+#+end_src
+
+#+begin_src yaml :tangle roles/deploy-descry/templates/descry-service.yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ appname }}-service
+  namespace: archives
+  annotations:
+    metallb.universe.tf/address-pool: default-pool
+spec:
+  type: LoadBalancer
+  selector:
+    app: {{ appname }}
+  ports:
+    - port: {{ appport }}
+      targetPort: {{ appport }}
+  loadBalancerIP: 172.17.1.65
+#+end_src
+
+#+begin_src yaml :tangle roles/deploy-descry/tasks/main.yml
+- name: Create archives namespace
+  k8s:
+    name: archives
+    kind: Namespace
+    state: present
+
+- name: Deploy Descry Microservice pod
+  k8s:
+    definition: "{{ lookup('template', 'templates/descry-deployment.yml') | from_yaml }}"
+#+end_src
+
+#+begin_src yaml :tangle roles/deploy-descry/tasks/main.yml
+- name: Deploy Descry Microservice service
+  k8s:
+    definition: "{{ lookup('template', 'templates/descry-service.yml') | from_yaml }}"
+#+end_src
+
+** Undeploy
+
+#+begin_src yaml :tangle roles/undeploy-descry/tasks/main.yml
+- name: Undeploy descry
+  k8s:
+    name: descry
+    namespace: archives
+    kind: Deployment
+    state: absent
+    wait: True
+#+end_src

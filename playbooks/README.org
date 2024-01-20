@@ -442,6 +442,7 @@ spec:
     push: true
     source: build
     force_source: true
+    force_tag: true
 #+end_src
 
 ** Deploy the stacks

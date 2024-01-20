@@ -1,0 +1,6 @@
+---
+- name: Provision a redis server stack
+  hosts: controllers
+  become: true
+  roles:
+    - role: redis-server-stack

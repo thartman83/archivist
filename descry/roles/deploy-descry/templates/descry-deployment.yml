@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ appname }}
+  namespace: archives
+  labels:
+    run: {{ appname }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      run: {{ appname }}
+  template:
+    metadata:
+      labels:
+        run: {{ appname }}
+        app: {{ appname }}
+    spec:
+      containers:
+      - name: descry
+        image: 172.17.1.62:5000/descry:latest
+        ports:
+        - containerPort: {{ appport }}

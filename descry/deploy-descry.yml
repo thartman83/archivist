@@ -1,0 +1,4 @@
+- name: Deploy Descry Microservice
+  hosts: controller
+  roles:
+    - role: deploy-descry

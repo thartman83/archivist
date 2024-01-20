@@ -1,0 +1,13 @@
+- name: Create archives namespace
+  k8s:
+    name: archives
+    kind: Namespace
+    state: present
+
+- name: Deploy Descry Microservice pod
+  k8s:
+    definition: "{{ lookup('template', 'templates/descry-deployment.yml') | from_yaml }}"
+
+- name: Deploy Descry Microservice service
+  k8s:
+    definition: "{{ lookup('template', 'templates/descry-service.yml') | from_yaml }}"

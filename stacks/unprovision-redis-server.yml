@@ -1,0 +1,6 @@
+---
+- name: Unprovision the redis server
+  hosts: controllers
+  become: true
+  roles:
+    - role: unprovision

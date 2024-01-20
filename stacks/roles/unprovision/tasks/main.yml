@@ -1,0 +1,38 @@
+- name: Delete the stacks-sentinel statefulset
+  k8s:
+    name: "{{ sentinel_name }}"
+    kind: StatefulSet
+    state: absent
+
+- name: Delete the stacks statefulset
+  k8s:
+    name: "{{ stacks_name }}"
+    kind: StatefulSet
+    state: absent
+
+- name: Delete the stacks pods
+  k8s:
+    name: "{{ stacks_name }}-{{ item }}"
+    kind: Pod
+    state: absent
+  loop:
+    - 0
+    - 1
+    - 2
+
+- name: Delete the sentinel pods
+  k8s:
+    name: "{{ sentinel_name }}-{{ item }}"
+    kind: Pod
+    state: absent
+  loop:
+    - 0
+    - 1
+    - 2
+
+- name: Delete the namespace
+  k8s:
+    name: "{{ archives_namespace }}"
+    kind: Namespace
+    state: absent
+    wait: true

@@ -9,7 +9,6 @@ cd stack
 kubectl create ns archives
 kubectl apply -n archives -f stacks-configmap.yaml
 kubectl apply -n archives -f stacks-statefulset.yaml
-
 kubectl apply -n archives -f stacks-sentinels.yaml
 #+end_src
 
